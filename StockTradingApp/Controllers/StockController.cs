@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using StockTradingApp.Data;
 using StockTradingApp.Model;
+using StockTradingApp.Service;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,30 +12,29 @@ namespace StockTradingApp.Controllers
     [Route("api/[controller]")]
     public class StockController : ControllerBase
     {
-        private static List<StockPrice> _stockPrices;
+        private readonly IStockRepository _stockRepository;
 
-        public StockController()
+
+
+        public StockController(IStockRepository stockRepository)
         {
-            // Populate with 1 million rows of sample data
-            if (_stockPrices == null || !_stockPrices.Any())
-            {
-                _stockPrices = SampleDataGenerator.GenerateStockPrices(1000000);
-            }
+            _stockRepository = stockRepository;
         }
 
         // GET: api/stock
         [HttpGet]
         public IActionResult GetAllStocks()
         {
-            return Ok(_stockPrices.Take(100).ToList()); // Paginate results (for performance)
+            var stocks = _stockRepository.GetAllStocks();
+            return Ok(stocks);
         }
 
         // GET: api/stock/{symbol}
         [HttpGet("{symbol}")]
         public IActionResult GetStockBySymbol(string symbol)
         {
-            var stock = _stockPrices.Where(s => s.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase)).ToList();
-            if (stock == null || !stock.Any())
+            var stock = _stockRepository.GetStockBySymbol(symbol);
+            if (stock == null || stock.Count == 0)
             {
                 return NotFound();
             }
@@ -51,7 +51,7 @@ namespace StockTradingApp.Controllers
                 return BadRequest("Invalid stock data.");
             }
 
-            _stockPrices.Add(newStock);
+            _stockRepository.AddStock(newStock);
             return Ok(newStock);
         }
 
@@ -59,28 +59,15 @@ namespace StockTradingApp.Controllers
         [HttpPut("{symbol}")]
         public IActionResult UpdateStock(string symbol, [FromBody] StockPrice updatedStock)
         {
-            var stock = _stockPrices.FirstOrDefault(s => s.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase));
-            if (stock == null)
-            {
-                return NotFound();
-            }
-
-            stock.Price = updatedStock.Price;
-            stock.Timestamp = updatedStock.Timestamp;
-
-            return Ok(stock);
+            _stockRepository.UpdateStock(symbol, updatedStock);
+            return Ok(updatedStock);
         }
 
         // DELETE: api/stock/{symbol}
         [HttpDelete("{symbol}")]
         public IActionResult DeleteStock(string symbol)
         {
-            var stock = _stockPrices.RemoveAll(s => s.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase));
-            if (stock == 0)
-            {
-                return NotFound();
-            }
-
+            _stockRepository.DeleteStock(symbol);
             return Ok();
         }
 
@@ -88,19 +75,7 @@ namespace StockTradingApp.Controllers
         [HttpGet("topperformers/{n}")]
         public IActionResult GetTopPerformers(int n)
         {
-            var topPerformers = _stockPrices
-                .GroupBy(s => s.Symbol)
-                .Select(g => new
-                {
-                    Symbol = g.Key,
-                    MinPrice = g.Min(s => s.Price),
-                    MaxPrice = g.Max(s => s.Price),
-                    Performance = g.Max(s => s.Price) - g.Min(s => s.Price)
-                })
-                .OrderByDescending(p => p.Performance)
-                .Take(n)
-                .ToList();
-
+            var topPerformers = _stockRepository.GetTopPerformers(n);
             return Ok(topPerformers);
         }
 

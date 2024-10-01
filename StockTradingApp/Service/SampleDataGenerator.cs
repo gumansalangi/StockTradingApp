@@ -1,6 +1,6 @@
 ﻿using StockTradingApp.Model;
 
-namespace StockTradingApp.Data
+namespace StockTradingApp.Service
 {
     public class SampleDataGenerator
     {
